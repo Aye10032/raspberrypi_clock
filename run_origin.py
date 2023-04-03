@@ -1,49 +1,24 @@
-import logging
+#!/usr/bin/python
+# -*- coding: UTF-8 -*-
+# import chardet
+import os
 import sys
 import time
-
+import logging
+import spidev as SPI
 import requests
 import schedule
+
+from lib import LCD_1inch3
 from PIL import Image, ImageDraw, ImageFont
-from ST7789 import ST7789
 
-# General
-SPI_PORT = 0
-SPI_CS = 0
-SPI_DC = 25
-BACKLIGHT = 18
-SPI_RST = 27
-
-# Screen dimensions
-WIDTH = 240
-HEIGHT = 240
-
-buffer = Image.new("RGB", (WIDTH, HEIGHT))
-draw = ImageDraw.Draw(buffer)
-
-draw.rectangle((0, 0, 50, 50), (255, 0, 0))
-draw.rectangle((320 - 50, 0, 320, 50), (0, 255, 0))
-draw.rectangle((0, 240 - 50, 50, 240), (0, 0, 255))
-draw.rectangle((320 - 50, 240 - 50, 320, 240), (255, 255, 0))
-
-disp = ST7789(
-    port=SPI_PORT,
-    cs=SPI_CS,
-    dc=SPI_DC,
-    backlight=BACKLIGHT,
-    rst=SPI_RST,
-    width=WIDTH,
-    height=HEIGHT,
-    rotation=0,
-    spi_speed_hz=60 * 1000 * 1000,
-    invert=True
-)
-
-# Initialize display.
-disp.begin()
-
-WIDTH = disp.width
-HEIGHT = disp.height
+# Raspberry Pi pin configuration:
+RST = 27
+DC = 25
+BL = 18
+bus = 0
+device = 0
+logging.basicConfig(level=logging.INFO)
 
 weather_text = '--'
 weather_icon = '/home/pi/clock/icons/999-fill.png'
@@ -89,6 +64,16 @@ def update_weather():
 
 def mainrun():
     try:
+        # display with hardware SPI:
+        ''' Warning!!!Don't  creation of multiple displayer objects!!! '''
+        # disp = LCD_1inch3.LCD_1inch3(spi=SPI.SpiDev(bus, device), spi_freq=10000000, rst=RST, dc=DC, bl=BL)
+        disp = LCD_1inch3.LCD_1inch3()
+        # Initialize library.
+        disp.Init()
+        # Clear display.
+        disp.clear()
+
+        # logging.info("draw text")
         Font3 = ImageFont.truetype("/home/pi/clock/Font/Font00.ttf", 40)
         Font2_5 = ImageFont.truetype("/home/pi/clock/Font/Font00.ttf", 28)
         Font1 = ImageFont.truetype("/home/pi/clock/Font/Font00.ttf", 26)
@@ -98,8 +83,9 @@ def mainrun():
         schedule.every(10).minutes.do(update_weather)
 
         while True:
-            image = Image.open('/home/pi/clock/bg.jpg')
-            draw = ImageDraw.Draw(image)
+            # Create blank image for drawing.
+            image1 = Image.open('/home/pi/clock/bg.jpg')
+            draw = ImageDraw.Draw(image1)
 
             schedule.run_pending()
 
@@ -137,14 +123,18 @@ def mainrun():
             draw.text((165, 194), temperature, fill='WHITE', font=Font1_5)
 
             # image1 = image1.rotate(180)
-            img_flip = image.transpose(Image.FLIP_LEFT_RIGHT)
-            disp.display(img_flip)
+            image1 = image1.transpose(Image.FLIP_LEFT_RIGHT)
+            disp.ShowImage(image1)
             time.sleep(1)
+
+        disp.clear()
+        disp.module_exit()
+        logging.info("quit:")
 
     except IOError as e:
         logging.info(e)
     except KeyboardInterrupt:
-        disp.reset()
+        disp.module_exit()
         logging.info("quit:")
         exit()
 
